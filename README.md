@@ -8,6 +8,7 @@ Build with Qt 5.  Requires linking with the QtNetwork module (included in a typi
 On Windows/Linux where Qt Creator is installed: open the project file (janus-server-c.pro) and start a release build.  On Linux where no GUI is available (assumes Qt5 SDK is installed):
 
 > qmake -makefile
+
 > make
 
 and a `janus-server-c` binary will be created.  Run with:
