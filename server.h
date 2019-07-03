@@ -12,6 +12,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QWebSocketServer>
 
 #include "session.h"
 
@@ -29,8 +30,8 @@ public slots:
 
     void connected();
     void disconnected();
-    void bytesWritten(qint64 bytes);
-    void readyRead();
+    void bytesWritten(qint64 bytes);    
+    void onTextMessageReceived(QString message);
 
 private:
 
@@ -47,7 +48,7 @@ private:
 
     QMap <QString, QPointer <Session> > _sessions; //"userId" index maps to specific Session
     QMap <QString, QVector <QPointer <Session> > > _rooms; //"roomId" index maps to Sessions listening
-    QTcpServer * _server;
+    QWebSocketServer * _server;
 
 };
 

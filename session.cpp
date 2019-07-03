@@ -1,16 +1,16 @@
 #include "session.h"
 
-Session::Session(QTcpSocket * socket)
+Session::Session(QWebSocket * socket)
 {    
 //    qDebug() << "Session::Session";
     _socket = socket;
     connect(socket, SIGNAL(connected()),this, SLOT(connected()));
     connect(socket, SIGNAL(disconnected()),this, SLOT(disconnected()));
-    connect(socket, SIGNAL(bytesWritten(qint64)),this, SLOT(bytesWritten(qint64)));
-    connect(socket, SIGNAL(readyRead()),this, SLOT(readyRead()));
+    connect(socket, SIGNAL(bytesWritten(qint64)),this, SLOT(bytesWritten(qint64)));    
+    connect(socket, SIGNAL(textMessageReceived(QString)),this, SLOT(textMessageReceived(QString)));
 }
 
-QTcpSocket * Session::GetSocket()
+QWebSocket * Session::GetSocket()
 {
     return _socket;
 }
@@ -27,7 +27,7 @@ void Session::SendClientError(const QString error)
         QJsonDocument doc(o);
         QByteArray b = doc.toJson(QJsonDocument::Compact) + "\n";
 
-        qint64 bytesWritten = _socket->write(b.data(), b.size());
+        _socket->sendTextMessage(b);
         qDebug() << "Session::SendClientError()" << error;
     }
 }
@@ -42,7 +42,7 @@ void Session::SendData(const QString method, const QJsonObject data)
         QJsonDocument doc(o);
         QByteArray b = doc.toJson(QJsonDocument::Compact) + "\n";
 
-        _socket->write(b.data(), b.size());
+        _socket->sendTextMessage(b);
 //        qDebug() << "Session::SendData()" << b.size();
     }
 }
@@ -55,8 +55,7 @@ void Session::SendOkay()
 
         QJsonDocument doc(o);
         QByteArray b = doc.toJson(QJsonDocument::Compact) + "\n";
-
-        _socket->write(b.data(), b.size());
+        _socket->sendTextMessage(b);
 //        qDebug() << "Session::SendOkay()" << b.size();
     }
 }
@@ -78,10 +77,10 @@ void Session::bytesWritten(qint64 bytes)
 //    qDebug() << "Session::bytesWritten()";
     emit socketBytesWritten(bytes);
 }
-void Session::readyRead()
+
+void Session::textMessageReceived(QString message)
 {
-//    qDebug() << "Session::readyRead()";
-    emit socketReadyRead();
+    emit socketTextMessageReceived(message);
 }
 
 void Session::SetId(QString id)

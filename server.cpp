@@ -3,11 +3,12 @@
 Server::Server(QObject *parent) :
     QObject(parent)
 {
-    _server = new QTcpServer(this);
+    qDebug() << "JanusVR Presence Server (C++) v1.1";
+    _server = new QWebSocketServer("presenceserver", QWebSocketServer::NonSecureMode, this);
     connect(_server, SIGNAL(newConnection()), this, SLOT(newConnection()));
 
     if (_server->listen(QHostAddress::Any, 5566)) {
-        qDebug() << "Server::Server pid(" << QCoreApplication::applicationPid() << ") listening for clients on port" << _server->serverAddress() << _server->serverPort();
+        qDebug() << "Server::Server pid(" << QCoreApplication::applicationPid() << ") listening for clients on" << _server->serverAddress() << _server->serverPort();
     }
 }
 
@@ -20,15 +21,16 @@ Server::~Server()
 }
 
 void Server::newConnection()
-{
+{    
+    qDebug() << "Server::newConnection()";
     // need to grab the socket
-    QTcpSocket * socket = _server->nextPendingConnection();
+    QWebSocket * socket = _server->nextPendingConnection();
     if (socket) {
         Session * session = new Session(socket);
         connect(session, SIGNAL(socketConnected()), this, SLOT(connected()));
         connect(session, SIGNAL(socketDisconnected()), this, SLOT(disconnected()));
-        connect(session, SIGNAL(socketBytesWritten(qint64)), this, SLOT(bytesWritten(qint64)));
-        connect(session, SIGNAL(socketReadyRead()), this, SLOT(readyRead()));
+        connect(session, SIGNAL(socketBytesWritten(qint64)), this, SLOT(bytesWritten(qint64)));        
+        connect(session, SIGNAL(socketTextMessageReceived(QString)), this, SLOT(onTextMessageReceived(QString)));
 //        _sessions.push_back(session);
         qDebug() << "Server::newConnection() Client:" << socket->peerAddress() << socket->peerPort();
     }
@@ -68,12 +70,13 @@ void Server::bytesWritten(qint64 )
 //    qDebug() << "Server::bytesWritten()" << bytes;
 }
 
-void Server::readyRead()
+void Server::onTextMessageReceived(QString message)
 {
-//    qDebug() << "Server::readyRead()";
+//    qDebug() << "Server::onTextMessageReceived" << message;
+
     Session * session = reinterpret_cast<Session *>(QObject::sender());
     if (session) {
-        const QByteArray b = session->GetSocket()->readLine();
+        const QByteArray b = message.toLatin1();
 
         // get the root object
         QJsonDocument doc = QJsonDocument::fromJson(b);
@@ -295,7 +298,7 @@ void Server::BroadcastToRoom(Session *session, const QString method, const QJson
     for (QPointer <Session> & s : sessions) {
         if (s && s->GetSocket() && s != session) {
 //            qDebug() << " broadcasting" << method << "to user" << s->GetId();
-            s->GetSocket()->write(b.data(), b.size());
+            s->GetSocket()->sendTextMessage(b);
         }
     }
 }
