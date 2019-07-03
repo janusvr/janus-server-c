@@ -5,7 +5,14 @@ Janus Presence Server, C++ implementation
 
 Build with Qt 5.  Requires linking with the QtNetwork module (included in a typical Qt SDK install).
 
-On Windows/Linux where Qt Creator is installed: open the project file (janus-server-c.pro) and start a release build.  A janus-server-c executable will be built.
+On Windows/Linux where Qt Creator is installed: open the project file (janus-server-c.pro) and start a release build.  On Linux where no GUI is available (assumes Qt5 SDK is installed):
+
+> qmake -makefile
+> make
+
+and a `janus-server-c` binary will be created.  Run with:
+
+> ./janus-server-c
 
 ### General Features
 
@@ -23,7 +30,7 @@ You can test that the server is up by using telnet.
 
 > telnet localhost 5566
 
-Copy and paste the examples below to see how it works
+Copy and paste the examples below to see how it works (which also serve as protocol documentation):
 
 =================================
 ### 1. Client -> Server Methods:
