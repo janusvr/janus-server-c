@@ -1,18 +1,17 @@
 #include "server.h"
 
-Server::Server(QObject *parent) :
-    QObject(parent)
-{
-    const int websocketport = 5566;
-    const int udpport = 5568;
+Server::Server(const int websocketport, const int udpport)
+{    
 
-    _server = new QWebSocketServer("presenceserver", QWebSocketServer::NonSecureMode, this);
+    _server = new QWebSocketServer("janus-server-c", QWebSocketServer::NonSecureMode, this);
     connect(_server, SIGNAL(newConnection()), this, SLOT(newConnection()));
 
     _udpsocket = new QUdpSocket();
     connect(_udpsocket, SIGNAL(readyRead()), this, SLOT(readPendingDatagrams()));
 
     qDebug() << "JanusVR Presence Server (C++) v1.2 - process id" << QCoreApplication::applicationPid();
+    qDebug() << "Usage: ";
+    qDebug() << "\tjanus-server-c [-wsport x] [-udpport x]";
 
     if (_server->listen(QHostAddress::Any, websocketport)) {
         qDebug() << "Server::Server listening for WebSocket clients on" << _server->serverAddress() << _server->serverPort();
