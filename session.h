@@ -8,6 +8,7 @@
 #include <QWebSocket>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QUdpSocket>
 
 class Session : public QObject
 {
@@ -16,16 +17,22 @@ class Session : public QObject
 public:
 
     Session(QWebSocket * socket);
+    ~Session();
+
     QWebSocket *GetSocket();
     void SendClientError(const QString error);
-    void SendData(const QString method, const QJsonObject data);
-    void SendOkay();
+    void SendData(const QString method, const QJsonObject data = QJsonObject());
 
     void SetId(QString id);
     QString GetId();
 
     void SetRoomId(QString roomId);
     QString GetRoomId();
+
+    QString GetIpPortCombo();
+
+    void SetUdpPort(const int i);
+    void SendMessage(const QByteArray b, const bool udpPreferred);
 
 signals:
 
@@ -47,6 +54,8 @@ private:
     QString _id;
     QString _roomId;
 
+    QUdpSocket * _udpSocket;
+    quint16 _udpPort; //UDP supported if port > 0
 };
 
 #endif // SESSION_H

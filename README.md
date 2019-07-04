@@ -49,6 +49,12 @@ This is an example of a message to logon with if the userId "LL" has not been re
 {"method":"logon","data":{"userId":"LL", "version":"23.4","roomId":"345678354764987457"}}
 ```
 
+or optionally, if the client wishes to negotiate sending of UDP packets with the server, the client will include udpport (unsigned 16-bit) that Janus listens for incoming UDP packets on
+
+```json
+{"method":"logon","data":{"userId":"LL", "version":"23.4","roomId":"345678354764987457", "udp":udpport}}
+```
+
 Client -> Server Message Example
 
 ```json
@@ -79,6 +85,12 @@ If everything is OK and you logged in then you will receive:
 
 ```json
 {"method":"okay"}
+```
+
+and optionally, if the server supports UDP it provides an incoming port to use for UDP datagram packets, udpport (unsigned 16-bit) which defaults to 5568:
+
+```json
+{"method":"okay", "data":{"udp":udpport}}
 ```
 
 If no roomId was found in the logon request:

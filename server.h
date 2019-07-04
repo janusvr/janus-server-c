@@ -13,6 +13,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QWebSocketServer>
+#include <QUdpSocket>
 
 #include "session.h"
 
@@ -33,6 +34,8 @@ public slots:
     void bytesWritten(qint64 bytes);    
     void onTextMessageReceived(QString message);
 
+    void readPendingDatagrams();
+
 private:
 
     void DoLogon(Session *session, QJsonObject data);
@@ -46,9 +49,14 @@ private:
 
     void BroadcastToRoom(Session *session, const QString method, const QJsonObject data);
 
+    void ProcessMessage(Session * session, const QByteArray & b);
+
+    QMap <QString, QString> _ipPortToUserId; //note: for UDP packet -> userId lookup only
     QMap <QString, QPointer <Session> > _sessions; //"userId" index maps to specific Session
     QMap <QString, QVector <QPointer <Session> > > _rooms; //"roomId" index maps to Sessions listening
+
     QWebSocketServer * _server;
+    QUdpSocket * _udpsocket;
 
 };
 
