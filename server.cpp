@@ -17,7 +17,8 @@ Server::Server(const int websocketport, const int udpport)
         qDebug() << "Server::Server listening for WebSocket clients on" << _server->serverAddress() << _server->serverPort();
     }
 
-    if (_udpsocket->bind(QHostAddress::Any, udpport)) {
+    _udpport = udpport;
+    if (_udpsocket->bind(QHostAddress::Any, _udpport)) {
         qDebug() << "Server::Server listening for UDP clients on" << _server->serverAddress() << udpport;
 
     }
@@ -190,7 +191,7 @@ void Server::DoLogon(Session * session, QJsonObject data)
         QString roomId = data["roomId"].toString();
         int udpPort = 0;
 
-        if (data.contains("udp")) {
+        if (data.contains("udp") && _udpport > 0) {
             udpPort = data["udp"].toInt();
         }
 

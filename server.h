@@ -57,6 +57,7 @@ private:
 
     QWebSocketServer * _server;
     QUdpSocket * _udpsocket;
+    int _udpport;
 
 };
 
