@@ -109,7 +109,8 @@ void Server::ProcessMessage(Session * session, const QByteArray & b)
 
 //        qDebug() << " data:" << o;
     if (!o.contains("method") || !o.contains("data")) {
-        session->SendClientError("method and data need to be defined");
+        session->SendClientError("method or data need to be defined");
+        qDebug() << "  Packet:" << b.left(256);
     }
     else {
         const QString method = o["method"].toString();
