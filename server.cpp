@@ -4,10 +4,7 @@ Server::Server(const quint16 websocketport, const quint16 udpport)
 {    
 
     _server = new QWebSocketServer("janus-server-c", QWebSocketServer::NonSecureMode, this);
-    connect(_server, SIGNAL(newConnection()), this, SLOT(newConnection()));
-
-    _udpsocket = new QUdpSocket();
-    connect(_udpsocket, SIGNAL(readyRead()), this, SLOT(readPendingDatagrams()));
+    connect(_server, SIGNAL(newConnection()), this, SLOT(newConnection()));       
 
     qDebug() << "JanusVR Presence Server (C++) v1.3 - process id" << QCoreApplication::applicationPid();
     qDebug() << "Usage: ";
@@ -18,9 +15,10 @@ Server::Server(const quint16 websocketport, const quint16 udpport)
     }
 
     _udpport = udpport;
-    if (_udpsocket->bind(QHostAddress::Any, _udpport)) {
+    _udpsocket = new QUdpSocket();
+    if (_udpport > 0 && _udpsocket->bind(QHostAddress::Any, _udpport)) {
+        connect(_udpsocket, SIGNAL(readyRead()), this, SLOT(readPendingDatagrams()));
         qDebug() << "Server::Server listening for UDP clients on" << _server->serverAddress() << udpport;
-
     }
 }
 
@@ -231,7 +229,9 @@ void Server::DoLogon(Session * session, QJsonObject data)
 
             //send our UDP port as well
             QJsonObject data;
-            data["udp"] = _udpsocket->localPort();
+            if (_udpport > 0) {
+                data["udp"] = _udpsocket->localPort();
+            }
             session->SendData("okay", data);
 
             qDebug() << "Server::DoLogon() User" << userId << "logged in. Sessions: " << _sessions.size() << " Rooms: " << _rooms.size();
