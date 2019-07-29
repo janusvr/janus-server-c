@@ -274,7 +274,7 @@ void Server::DoUnsubscribe(Session *session, QJsonObject data)
     QList <QString> keys = _rooms.keys();
     for (QString & s: keys) {
         if (_rooms[s].isEmpty()) {
-            _rooms.remove(s)
+            _rooms.remove(s);
         }
         else {
             bool all_null = true;
