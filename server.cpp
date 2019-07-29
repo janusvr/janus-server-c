@@ -266,7 +266,27 @@ void Server::DoUnsubscribe(Session *session, QJsonObject data)
         if (session) {
             QString roomId = data["roomId"].toString();
             _rooms[roomId].removeAll(session);
-            session->SendData("okay");
+            session->SendData("okay");                        
+        }
+    }
+
+    //Cleanup _rooms on unsubscribe
+    QList <QString> keys = _rooms.keys();
+    for (QString & s: keys) {
+        if (_rooms[s].isEmpty()) {
+            _rooms.remove(s)
+        }
+        else {
+            bool all_null = true;
+            for (int i=0; i<_rooms[s].size(); ++i) {
+                if (!_rooms[s][i].isNull()) {
+                    all_null = false;
+                    break;
+                }
+            }
+            if (all_null) {
+                _rooms.remove(s);
+            }
         }
     }
 }
