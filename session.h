@@ -29,9 +29,9 @@ public:
     void SetRoomId(QString roomId);
     QString GetRoomId();
 
-    QString GetIpPortCombo();
+    void SetUdpPort(const quint16 i);
+    quint16 GetUdpPort() const;
 
-    void SetUdpPort(const int i);
     void SendMessage(const QByteArray b, const bool udpPreferred);
 
 signals:

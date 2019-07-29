@@ -98,14 +98,14 @@ QString Session::GetRoomId()
     return _roomId;
 }
 
-QString Session::GetIpPortCombo()
-{
-    return _socket->peerAddress().toString() + ":" + QString::number(_udpPort);
-}
-
-void Session::SetUdpPort(const int i)
+void Session::SetUdpPort(const quint16 i)
 {
     _udpPort = i;
+}
+
+quint16 Session::GetUdpPort() const
+{
+    return _udpPort;
 }
 
 void Session::SendMessage(const QByteArray b, const bool udpPreferred)

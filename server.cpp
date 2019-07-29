@@ -1,6 +1,6 @@
 #include "server.h"
 
-Server::Server(const int websocketport, const int udpport)
+Server::Server(const quint16 websocketport, const quint16 udpport)
 {    
 
     _server = new QWebSocketServer("janus-server-c", QWebSocketServer::NonSecureMode, this);
@@ -9,7 +9,7 @@ Server::Server(const int websocketport, const int udpport)
     _udpsocket = new QUdpSocket();
     connect(_udpsocket, SIGNAL(readyRead()), this, SLOT(readPendingDatagrams()));
 
-    qDebug() << "JanusVR Presence Server (C++) v1.2 - process id" << QCoreApplication::applicationPid();
+    qDebug() << "JanusVR Presence Server (C++) v1.3 - process id" << QCoreApplication::applicationPid();
     qDebug() << "Usage: ";
     qDebug() << "\tjanus-server-c [-wsport x] [-udpport x]";
 
@@ -61,26 +61,20 @@ void Server::disconnected()
             qDebug() << "Server::disconnected()" << session->GetSocket()->peerAddress() << session->GetSocket()->peerPort();
         }
 
-        //perform cleanup for this session only if this user was really authenticated (ipPortcombo must be in ipPortToUserId)
-        const QString ipPortCombo = session->GetIpPortCombo();
-        if (_ipPortToUserId.contains(ipPortCombo) && _ipPortToUserId[ipPortCombo] == session->GetId()) {
-            QString userId = session->GetId();
-            QJsonObject disconnectdata;
-            disconnectdata["userId"] = userId;
+        //perform cleanup for this session
+        QString userId = session->GetId();
+        QJsonObject disconnectdata;
+        disconnectdata["userId"] = userId;
 
-            //broadcast out user_disconnected event to all users listening to roomId
-            BroadcastToRoom(session, "user_disconnected", disconnectdata);
+        //broadcast out user_disconnected event to all users listening to roomId
+        BroadcastToRoom(session, "user_disconnected", disconnectdata);
 
-            _ipPortToUserId.remove(ipPortCombo);
-            _sessions.remove(userId); //remove connected userId
-            for (QVector <QPointer <Session> > & sessions : _rooms) { //remove session from listening to all roomId's
-                sessions.removeAll(session);
-            }
-            delete session;
-
-//            qDebug() << "Server::disconnected()" << _ipPortToUserId << _sessions;
+        _sessions.remove(userId); //remove connected userId
+        for (QVector <QPointer <Session> > & sessions : _rooms) { //remove session from listening to all roomId's
+            sessions.removeAll(session);
         }
-
+        delete session;
+//            qDebug() << "Server::disconnected()" << _ipPortToUserId << _sessions;        
     }
 }
 
@@ -91,13 +85,38 @@ void Server::bytesWritten(qint64 )
 
 void Server::onTextMessageReceived(QString message)
 {
-//    qDebug() << "Server::onTextMessageReceived" << message;
-
     Session * session = reinterpret_cast<Session *>(QObject::sender());
     if (session) {
         const QByteArray b = message.toLatin1();
-
         ProcessMessage(session, b);
+    }
+}
+
+void Server::UpdateUDPPort(const QByteArray & b, quint16 senderPort)
+{
+    QJsonDocument doc = QJsonDocument::fromJson(b);
+    QJsonObject o = doc.object();
+
+    if (!o.contains("method") || !o.contains("data")) {
+        qDebug("  Server::UpdateUDPPort - method or data need to be defined");
+        return;
+    }
+
+    const QJsonObject data = o["data"].toObject();
+    if (!data.contains("userId")) {
+//        qDebug() << " Server::UpdateUDPPort - userID needs to be defined within data";
+        return;
+    }
+
+    const QString userId = data["userId"].toString();
+    if (!_sessions.contains(userId) || _sessions[userId].isNull()) {
+//        qDebug() << " Server::UpdateUDPPort - no session for given userId" << userId;
+        return;
+    }
+
+    if (_sessions[userId]->GetUdpPort() == 0) {
+        qDebug() << "Server::UpdateUDPPort - updating" << userId << "UDP port to " << senderPort;
+        _sessions[userId]->SetUdpPort(senderPort);
     }
 }
 
@@ -109,41 +128,59 @@ void Server::ProcessMessage(Session * session, const QByteArray & b)
 
 //        qDebug() << " data:" << o;
     if (!o.contains("method") || !o.contains("data")) {
-        session->SendClientError("method or data need to be defined");
+        qDebug("  Server::ProcessMessage - method or data need to be defined");
         qDebug() << "  Packet:" << b.left(256);
+        return;
+    }
+
+    const QString method = o["method"].toString();
+    const QJsonObject data = o["data"].toObject();
+    if (!data.contains("userId")) {
+//        qDebug() << " Server::ProcessMessage - userID needs to be defined within data";
+        return;
+    }
+
+    const QString userId = data["userId"].toString();
+
+    if (method == "logon" && session) {
+        //note: we do logon first, because we need to add it to sessions list
+        DoLogon(session, data);
+        return;
+    }
+
+    if (!_sessions.contains(userId)) {
+//        qDebug() << " Server::ProcessMessage - no active session with the supplied userId " << userId;
+        return;
+    }
+    else if (_sessions[userId].isNull()) {
+//        qDebug() << " Server::ProcessMessage - session null for given userId " << userId;
+        return;
+    }
+
+    QPointer <Session> s = _sessions[userId];
+    if (method == "subscribe") {
+        DoSubscribe(s, data);
+    }
+    else if (method == "unsubscribe") {
+        DoUnsubscribe(s, data);
+    }
+    else if (method == "enter_room") {
+        DoEnterRoom(s, data);
+    }
+    else if (method == "move") {
+        DoMove(s, data);
+    }
+    else if (method == "chat") {
+        DoChat(s, data);
+    }
+    else if (method == "portal") {
+        DoPortal(s, data);
+    }
+    else if (method == "users_online") {
+        DoUsersOnline(s, data);
     }
     else {
-        const QString method = o["method"].toString();
-        const QJsonObject data = o["data"].toObject();
-
-        if (method == "logon") {
-            DoLogon(session, data);
-        }
-        else if (method == "subscribe") {
-            DoSubscribe(session, data);
-        }
-        else if (method == "unsubscribe") {
-            DoUnsubscribe(session, data);
-        }
-        else if (method == "enter_room") {
-            DoEnterRoom(session, data);
-        }
-        else if (method == "move") {
-            DoMove(session, data);
-        }
-        else if (method == "chat") {
-            //chat method is the only method where data is a string and not a JSON object
-            DoChat(session, o["data"].toString());
-        }
-        else if (method == "portal") {
-            DoPortal(session, data);
-        }
-        else if (method == "users_online") {
-            DoUsersOnline(session, data);
-        }
-        else {
-            session->SendClientError("Unrecognized method");
-        }
+        s->SendClientError("Unrecognized method");
     }
 }
 
@@ -152,29 +189,16 @@ void Server::readPendingDatagrams()
 //    qDebug() << "Server::readPendingDatagrams()";
     while (_udpsocket->hasPendingDatagrams()) {
         QByteArray datagram;
-        datagram.resize(_udpsocket->pendingDatagramSize());
-
         QHostAddress sender;
         quint16 senderPort;
-        _udpsocket->readDatagram(datagram.data(), datagram.size(), &sender, &senderPort);
 
-        const QString ipPort = sender.toString()+":"+QString::number(senderPort);
-        //figure out which session this UDP packet is associated with
-        if (!_ipPortToUserId.contains(ipPort)) {
-            qDebug() << "Server::readPendingDatagrams() Warning, ignoring ip/port UDP datagram: " << ipPort;
-//            qDebug() << _ipPortToUserId;
-        }
-        else if (!_sessions.contains(_ipPortToUserId[ipPort])) {
-            qDebug() << "Server::readPendingDatagrams() Warning, ignoring UDP datagram from" << ipPort << "associated to userId: " << _ipPortToUserId[ipPort];
-//            qDebug() << _ipPortToUserId;
-//            qDebug() << _sessions.keys();
-        }
-        else {
-            Session * session = _sessions[_ipPortToUserId[ipPort]];
-            if (session) {
-                ProcessMessage(session, datagram);
-            }
-        }
+        const int maxSize = int(_udpsocket->pendingDatagramSize());
+        datagram.resize(maxSize);
+        _udpsocket->readDatagram(datagram.data(), maxSize, &sender, &senderPort);
+
+        //v1.3 Update outbound UDP port to use for this session
+        UpdateUDPPort(datagram, senderPort);
+        ProcessMessage(nullptr, datagram);
     }
 }
 
@@ -189,33 +213,25 @@ void Server::DoLogon(Session * session, QJsonObject data)
     }
     else {
         QString userId = data["userId"].toString();
-        QString roomId = data["roomId"].toString();
-        int udpPort = 0;
-
-        if (data.contains("udp") && _udpport > 0) {
-            udpPort = data["udp"].toInt();
-        }
-
-        session->SetId(userId);
-        session->SetRoomId(roomId);
-        session->SetUdpPort(udpPort);
+        QString roomId = data["roomId"].toString();       
 
         if (QRegExp("[^a-zA-Z0-9_]").indexIn(userId) >= 0) {
-            session->SendClientError("Illegal character in userId " + userId + ", only use alphanumeric and underscore");
+            session->SendClientError("Illegal character in userId" + userId + ", only use alphanumeric and underscore");
         }
         else if (_sessions.contains(userId)) {
             session->SendClientError("User name is already in use");
         }
         else {
-            qDebug() << "Server::DoLogon() User " << userId << "logged in.  UDP:" << udpPort;
-            //associated ip+port combo with this userId
-            _ipPortToUserId[session->GetIpPortCombo()] = userId;
+            qDebug() << "Server::DoLogon() User" << userId << "logged in";
+            //v1.3 - Note: only assign userId when user name is not already in use
+            session->SetId(userId);
+            session->SetRoomId(roomId);
+
             _sessions[userId] = session;
 
+            //send our UDP port as well
             QJsonObject data;
-            if (udpPort > 0) { //if client wants to use UDP, send our UDP port as well
-                data["udp"] = _udpsocket->localPort();                
-            }
+            data["udp"] = _udpsocket->localPort();
             session->SendData("okay", data);
         }
     }
@@ -293,17 +309,25 @@ void Server::DoMove(Session * session, QJsonObject data)
     BroadcastToRoom(session, "user_moved", movedata);
 }
 
-void Server::DoChat(Session *session, QString data)
+void Server::DoChat(Session *session, QJsonObject data)
 {
 //    qDebug() << "Server::DoChat()";
-
     QJsonObject chatdata;
     chatdata["roomId"] = session->GetRoomId();
     chatdata["userId"] = session->GetId();
-    chatdata["message"] = data;
 
-    //broadcast out user_chat event to all users listening to roomId
-    BroadcastToRoom(session, "user_chat", chatdata);
+    if (data.contains("message")) {
+        //broadcast out user_chat event to all users listening to roomId
+        chatdata["message"] = data["message"];
+
+        //PM a user, or broadcast to all
+        if (data.contains("toUserId")) {
+            BroadcastToUser(data["toUserId"].toString(), "user_chat", chatdata);
+        }
+        else {
+            BroadcastToRoom(session, "user_chat", chatdata);
+        }
+    }
 }
 
 void Server::DoPortal(Session *session, QJsonObject data)
@@ -349,6 +373,27 @@ void Server::DoUsersOnline(Session *session, QJsonObject data)
         data["roomId"] = roomId;
 
         session->SendData("users_online", data);
+    }
+}
+
+void Server::BroadcastToUser(QString userId, const QString method, const QJsonObject data)
+{
+    QJsonObject o;
+    o["method"] = method;
+    o["data"] = data;
+
+    QJsonDocument doc(o);
+    QByteArray b = doc.toJson(QJsonDocument::Compact) + "\n";
+
+    const bool udpPreferred = (method == "user_moved");
+
+    QPointer <Session> s;
+    if (_sessions.contains(userId) && _sessions[userId]) {
+        s = _sessions[userId];
+    }
+
+    if (s && s->GetSocket()) {
+        s->SendMessage(b, udpPreferred);
     }
 }
 

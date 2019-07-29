@@ -19,7 +19,7 @@ and a `janus-server-c` binary will be created.  Run with:
 
 | Feature | Description |
 | ---------------------- | ---- |
-|**Default Listening Port**|5566|
+|**Default Listening Port**|5566 (TCP) 5568 (UDP)|
 |**Protocol**|Ordinary socket, UTF-8 encoded|
 |**Encoding**|UTF-8|
 |**Message Format**|JSON objects formatted onto a single line|
@@ -30,6 +30,10 @@ and a `janus-server-c` binary will be created.  Run with:
 You can test that the server is up by using telnet.
 
 > telnet localhost 5566
+
+Note that disabling UDP connections can be done by specifying a udpport of 0:
+
+> ./janus-server-c -udpport 0
 
 Copy and paste the examples below to see how it works (which also serve as protocol documentation):
 
@@ -44,18 +48,6 @@ Copy and paste the examples below to see how it works (which also serve as proto
 Client -> Server Message Example:
 
 This is an example of a message to logon with if the userId "LL" has not been registered:
-
-```json
-{"method":"logon","data":{"userId":"LL", "version":"23.4","roomId":"345678354764987457"}}
-```
-
-or optionally, if the client wishes to negotiate sending of UDP packets with the server, the client will include udpport (unsigned 16-bit) that Janus listens for incoming UDP packets on
-
-```json
-{"method":"logon","data":{"userId":"LL", "version":"23.4","roomId":"345678354764987457", "udp":udpport}}
-```
-
-Client -> Server Message Example
 
 ```json
 {"method":"logon","data":{"userId":"LL", "version":"23.4","roomId":"345678354764987457"}}
@@ -124,13 +116,13 @@ TODO: Reject incompatable clients
 When you pass through a portal:
 
 ```json
-{"method":"enter_room", "data": { "roomId": "345678354764987457" }}
+{"method":"enter_room", "data": {"userId":"LL", "roomId": "345678354764987457" }}
 ```
 
 Real example from JanusVR 40.3:
 
 ```json
-{"method":"enter_room", "data": {"roomId":"e562b2e1339fc08d635d28481121857c"}}
+{"method":"enter_room", "data": {"userId":"LL", "roomId":"e562b2e1339fc08d635d28481121857c"}}
 ```
 
 ----------------------
@@ -140,23 +132,23 @@ Real example from JanusVR 40.3:
 When the user position has moved:
 
 ```json
-{"method":"move", "data": [0,0,0,0,0,0,0] }
+{"method":"move", "data": {"userId":"LL", "roomId": "345678354764987457", ...} }
 ```
 
-Data can be anything you like, it will be passed to observers without validation
+Data can be anything you like, but must include the userId string.
 
 Real example from JanusVR 40.3:
 
 JanusVR submits extra information in first move call and every so often after the first call.  This is an example of a move call with extra information:
 
 ```json
-{"method":"move", "data":{"pos":"8.38889 -0.267704 -5.83333","dir":"-1 -1.33e-06 9.42e-07","view_dir":"-1 -1.33e-06 9.42e-07","up_dir":"-1.33e-06 1 1.25e-12","head_pos":"0 0 0","avatar":"<FireBoxRoom><Assets><AssetObject id=^head^ src=^http://avatars.vrsites.com/chibii/head_male.obj^ mtl=^http://avatars.vrsites.com/chibii/mtls/head_male3.mtl^ /><AssetObject id=^body^ src=^http://avatars.vrsites.com/chibii/body_male.obj^ mtl=^http://avatars.vrsites.com/chibii/mtls/body_male3.mtl^ /></Assets><Room><Ghost id=^ProudMinna333^ js_id=^3^ scale=^1.700000 1.700000 1.700000^ head_id=^head^ head_pos=^0.000000 0.750000 0.000000^ body_id=^body^ /></Room></FireBoxRoom>"}}
+{"method":"move", "data":{"userId":"LL", "pos":"8.38889 -0.267704 -5.83333","dir":"-1 -1.33e-06 9.42e-07","view_dir":"-1 -1.33e-06 9.42e-07","up_dir":"-1.33e-06 1 1.25e-12","head_pos":"0 0 0","avatar":"<FireBoxRoom><Assets><AssetObject id=^head^ src=^http://avatars.vrsites.com/chibii/head_male.obj^ mtl=^http://avatars.vrsites.com/chibii/mtls/head_male3.mtl^ /><AssetObject id=^body^ src=^http://avatars.vrsites.com/chibii/body_male.obj^ mtl=^http://avatars.vrsites.com/chibii/mtls/body_male3.mtl^ /></Assets><Room><Ghost id=^ProudMinna333^ js_id=^3^ scale=^1.700000 1.700000 1.700000^ head_id=^head^ head_pos=^0.000000 0.750000 0.000000^ body_id=^body^ /></Room></FireBoxRoom>"}}
 ```
 
 Most JanusVR calls only provide a limited data set:
 
 ```json
-{"method":"move", "data":{"pos":"8.38889 -0.267704 -5.83333","dir":"-1 -1.33e-06 9.42e-07","view_dir":"-1 -1.33e-06 9.42e-07","up_dir":"-1.33e-06 1 1.25e-12","head_pos":"0 0 0"}}
+{"method":"move", "data":{"userId":"LL", "pos":"8.38889 -0.267704 -5.83333","dir":"-1 -1.33e-06 9.42e-07","view_dir":"-1 -1.33e-06 9.42e-07","up_dir":"-1.33e-06 1 1.25e-12","head_pos":"0 0 0"}}
 ```
 
 -----------------------
@@ -166,7 +158,15 @@ Most JanusVR calls only provide a limited data set:
 When the user wants to send a text message:
 
 ```json
-{"method":"chat", "data": "The message"}
+{"method":"chat", "data": {"userId":"LL", "message":"The message"}}
+```
+
+The above message will be broadcasted to all clients in the same room as the user, they will all receive a user_chat notification.
+
+Clients may optionally include a "toUserId" string in the data, which specifies the userId to send a private message.  Only the user specified will receive a user_chat notification.
+
+```json
+{"method":"chat", "data": {"userId":"LL", "toUserId":"james", "message":"A private message for james"}}
 ```
 
 You can pass anything through the data field and it will be sent to all clients subscribed to the current room.
@@ -174,7 +174,7 @@ You can pass anything through the data field and it will be sent to all clients 
 Real example from JanusVR 40.3:
 
 ```json
-{"method":"chat", "data": "hello!"}
+{"method":"chat", "data": {"userId":"LL", "message":"The message"}}
 ```
 
 ----------------------------
@@ -184,21 +184,13 @@ Real example from JanusVR 40.3:
 When you wish to start receiving events about a room (you are in that room or looking through a portal)
 
 ```json
-{"method":"subscribe", "data": { "roomId": "345678354764987457" }}
+{"method":"subscribe", "data": { "userId":"LL", "roomId": "345678354764987457" }}
 ```
 
 Real example from JanusVR 40.3:
 
-The first "subscribe" call provides extra information:
-
 ```json
 {"method":"subscribe", "data":{"userId":"ProudMinna333","version":"40.3","roomId":"e562b2e1339fc08d635d28481121857c"}}
-```
-
-Subsequent "subscribe" calls provide less information:
-
-```json
-{"method":"subscribe", "data":{"roomId":"69de79e1077103cb59d1a890e96c7ef2"}}
 ```
 
 Will receive the following if everything is OK.
@@ -214,12 +206,8 @@ Will receive the following if everything is OK.
 When you no longer wish to receive messages from that room because none of its portals are visible
 
 ```json
-{"method":"unsubscribe", "data": { "roomId": "345678354764987457" }}
+{"method":"unsubscribe", "data": {"userId":"LL", "roomId": "345678354764987457"}}
 ```
-
-Real example from JanusVR 40.3:
-
-> TODO: Grab real example
 
 Will receive the following if everything is OK.
 
@@ -234,18 +222,20 @@ Will receive the following if everything is OK.
 When a user creates a new portal:
 
 ```json
-{"method":"portal", "data":{"url":"http://...", "pos":[1,2,4], "fwd":[0,1,0]}}
+{"method":"portal", "data":{"userId":"LL", "url":"http://...", "pos":[1,2,4], "fwd":[0,1,0]}}
 ```
 
 Real example from JanusVR 40.3:
 
 ```json
-{"method":"portal", "data":{"url":"http://www.vrsites.com","pos":"-7.16883 -0.267702 -6.57243","fwd":"0.967686 0 -0.234104"}}
+{"method":"portal", "data":{"userId":"LL", "url":"http://www.vrsites.com","pos":"-7.16883 -0.267702 -6.57243","fwd":"0.967686 0 -0.234104"}}
 ```
 
 Will receive the following if everything is OK.
 
-Will receive: {"method":"okay"}
+```json
+{"method":"okay"} 
+```
 
 --------------------------------
 #### 1.8 "users_online" Method
@@ -344,13 +334,7 @@ When a user changes room:
 {"method":"user_enter", "data":{"userId":"LL","roomId":"newRoomId"}}
 ```
 
-The followed up with a move "user_moved" event
-
-Real example from interaction with JanusVR 40.3:
-
-> TODO: Grab example of "user_leave"
-
-> TODO: Grab example of "user_enter"
+This is followed up with a "user_moved" event, to specify their position in the new room.
 
 -----------------------------------
 #### 2.4 "user_portal" notification
