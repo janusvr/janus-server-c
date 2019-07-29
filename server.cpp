@@ -50,7 +50,7 @@ void Server::newConnection()
 
 void Server::connected()
 {
-//    qDebug() << "Server::connected()";
+//    qDebug() << "Server::connected() Sessions: " << _sessions.size() << " Rooms: " << _rooms.size();
 }
 
 void Server::disconnected()
@@ -75,6 +75,7 @@ void Server::disconnected()
         }
         delete session;
 //            qDebug() << "Server::disconnected()" << _ipPortToUserId << _sessions;        
+//        qDebug() << "Server::disconnected() Sessions: " << _sessions.size() << " Rooms: " << _rooms.size();
     }
 }
 
@@ -221,8 +222,7 @@ void Server::DoLogon(Session * session, QJsonObject data)
         else if (_sessions.contains(userId)) {
             session->SendClientError("User name is already in use");
         }
-        else {
-            qDebug() << "Server::DoLogon() User" << userId << "logged in";
+        else {            
             //v1.3 - Note: only assign userId when user name is not already in use
             session->SetId(userId);
             session->SetRoomId(roomId);
@@ -233,6 +233,8 @@ void Server::DoLogon(Session * session, QJsonObject data)
             QJsonObject data;
             data["udp"] = _udpsocket->localPort();
             session->SendData("okay", data);
+
+            qDebug() << "Server::DoLogon() User" << userId << "logged in. Sessions: " << _sessions.size() << " Rooms: " << _rooms.size();
         }
     }
 
